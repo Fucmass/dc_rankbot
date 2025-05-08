@@ -1,0 +1,23 @@
+{
+  "name": "dc_rankbot",
+  "version": "1.0.0",
+  "description": "erm rab on top",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fucmass/dc_rankbot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Fucmass/dc_rankbot/issues"
+  },
+  "homepage": "https://github.com/Fucmass/dc_rankbot#readme",
+  "dependencies": {
+    "discord.js": "^14.19.2"
+  }
+}
