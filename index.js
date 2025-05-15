@@ -47,10 +47,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   const rankup = new SlashCommandBuilder()
     .setName('rankup')
-    .setDescription('Gives user the next rank.')
-    .addUserOption(option =>
-      option.setName('user')
-        .setDescription('The user thats ranking up.')
+    .setDescription('Gives users the next rank.')
+    .addStringOption(option =>
+      option.setName('users')
+        .setDescription('Comma-separated list of user mentions or IDs to rank up.')
         .setRequired(true));
   await client.application?.commands.create(rankup);
 
@@ -58,10 +58,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   const forcederank = new SlashCommandBuilder()
     .setName('forcederank')
-    .setDescription('Demotes a user.')
-    .addUserOption(option =>
-      option.setName('user')
-        .setDescription('The user to demote.')
+    .setDescription('Demotes users.')
+    .addStringOption(option =>
+      option.setName('users')
+        .setDescription('Comma-separated list of user mentions or IDs to demote.')
         .setRequired(true));
   await client.application?.commands.create(forcederank);
 
@@ -159,6 +159,65 @@ client.on(Events.InteractionCreate, async interaction => {
 
   // Handle /rankup command
   if (interaction.commandName === 'rankup') {
+    const roleHierarchy = ['test role 1', 'test role 2', 'test role 3']; // Add roles in ascending order of hierarchy
+
+    const requiredRoles = ['Perms'];
+    const hasAccess = await hasRequiredRole(interaction.user.id, requiredRoles);
+    if (!hasAccess) {
+      return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+
+    const usersInput = interaction.options.getString('users');
+    const userIds = usersInput.split(',').map(user => user.trim().replace(/[<@!>]/g, '')); // Extract user IDs from mentions or raw input
+
+    const results = [];
+
+    for (const userId of userIds) {
+      const member = interaction.guild.members.cache.get(userId);
+
+      if (!member) {
+        results.push(`User with ID ${userId} not found in this server.`);
+        continue;
+      }
+
+      const currentRole = roleHierarchy.find(roleName => member.roles.cache.some(role => role.name === roleName));
+
+      if (!currentRole) {
+        results.push(`${member.user.tag} does not have any roles in the hierarchy.`);
+        continue;
+      }
+
+      const currentRoleIndex = roleHierarchy.indexOf(currentRole);
+      const nextRole = roleHierarchy[currentRoleIndex + 1];
+
+      if (!nextRole) {
+        results.push(`${member.user.tag} already has the highest role in the hierarchy.`);
+        continue;
+      }
+
+      const nextRoleObject = interaction.guild.roles.cache.find(role => role.name === nextRole);
+
+      if (!nextRoleObject) {
+        results.push(`The role "${nextRole}" does not exist on this server.`);
+        continue;
+      }
+
+      try {
+        await member.roles.remove(member.roles.cache.find(role => role.name === currentRole));
+        await member.roles.add(nextRoleObject);
+        results.push(`Successfully promoted **${member.user.tag}** from **${currentRole}** to **${nextRole}**.`);
+      } catch (error) {
+        console.error(error);
+        results.push(`Failed to update roles for **${member.user.tag}**. Make sure the bot has the correct permissions.`);
+      }
+    }
+
+    await interaction.reply(results.join('\n'));
+  }
+
+
+  // Handle /forcederank command
+  if (interaction.commandName === 'forcederank') {
     // Define the role hierarchy
     const roleHierarchy = ['test role 1', 'test role 2', 'test role 3']; // Add roles in ascending order of hierarchy
 
@@ -169,95 +228,53 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
 
-    const targetUser = interaction.options.getUser('user');
-    const member = interaction.guild.members.cache.get(targetUser.id);
+    const usersInput = interaction.options.getString('users');
+    const userIds = usersInput.split(',').map(user => user.trim().replace(/[<@!>]/g, '')); // Extract user IDs from mentions or raw input
 
-    if (!member) {
-      return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+    const results = [];
+
+    for (const userId of userIds) {
+      const member = interaction.guild.members.cache.get(userId);
+
+      if (!member) {
+        results.push(`User with ID ${userId} not found in this server.`);
+        continue;
+      }
+
+      // Find the highest role the user currently has in the hierarchy
+      const currentRole = roleHierarchy.find(roleName => member.roles.cache.some(role => role.name === roleName));
+      if (!currentRole) {
+        results.push(`${member.user.tag} does not have any roles in the hierarchy.`);
+        continue;
+      }
+
+      // Determine the previous role in the hierarchy
+      const currentRoleIndex = roleHierarchy.indexOf(currentRole);
+      const previousRole = roleHierarchy[currentRoleIndex - 1];
+      if (!previousRole) {
+        results.push(`${member.user.tag} already has the lowest role in the hierarchy.`);
+        continue;
+      }
+
+      // Get the role objects for the current and previous roles
+      const previousRoleObject = interaction.guild.roles.cache.find(role => role.name === previousRole);
+      if (!previousRoleObject) {
+        results.push(`The role "${previousRole}" does not exist on this server.`);
+        continue;
+      }
+
+      try {
+        // Remove the current role and add the previous role
+        await member.roles.remove(member.roles.cache.find(role => role.name === currentRole));
+        await member.roles.add(previousRoleObject);
+        results.push(`Successfully demoted **${member.user.tag}** from **${currentRole}** to **${previousRole}**.`);
+      } catch (error) {
+        console.error(error);
+        results.push(`Failed to update roles for **${member.user.tag}**. Make sure the bot has the correct permissions.`);
+      }
     }
 
-    // Find the highest role the user currently has in the hierarchy
-    const currentRole = roleHierarchy.find(roleName => member.roles.cache.some(role => role.name === roleName));
-
-    if (!currentRole) {
-      return interaction.reply({ content: `${targetUser.tag} does not have any roles in the hierarchy.`, ephemeral: true });
-    }
-
-    // Determine the next role in the hierarchy
-    const currentRoleIndex = roleHierarchy.indexOf(currentRole);
-    const nextRole = roleHierarchy[currentRoleIndex + 1];
-
-    if (!nextRole) {
-      return interaction.reply({ content: `${targetUser.tag} already has the highest role in the hierarchy.`, ephemeral: true });
-    }
-
-    // Get the role objects for the current and next roles
-    const nextRoleObject = interaction.guild.roles.cache.find(role => role.name === nextRole);
-
-    if (!nextRoleObject) {
-      return interaction.reply({ content: `The role "${nextRole}" does not exist on this server.`, ephemeral: true });
-    }
-
-    try {
-      // Remove the current role and add the next role
-      await member.roles.remove(member.roles.cache.find(role => role.name === currentRole));
-      await member.roles.add(nextRoleObject);
-
-      await interaction.reply(`Successfully promoted **${targetUser.tag}** from **${currentRole}** to **${nextRole}**.`);
-    } catch (error) {
-      console.error(error);
-      await interaction.reply({ content: 'Failed to update roles. Make sure the bot has the correct permissions.', ephemeral: true });
-    }
-  }
-
-
-  // Handle /forcederank command
-  if (interaction.commandName === 'forcederank') {
-    // Define the role hierarchy
-    const roleHierarchy = ['test role 1', 'test role 2', 'test role 3']; // Add roles in ascending order of hierarchy
-    
-    // Check if the user has the required roles
-    const requiredRoles = ['Perms'];
-
-    // Gives access to users with the specified roles
-    const hasAccess = await hasRequiredRole(interaction.user.id, requiredRoles);
-    if (!hasAccess) {
-      return interaction.reply({ content: 'You do not have permission to use this command.', flags: MessageFlags.Ephemeral });
-    }
-
-    const targetUser = interaction.options.getUser('user');
-    const member = interaction.guild.members.cache.get(targetUser.id);
-
-    if (!member) {
-      return interaction.reply({ content: 'User not found in this server.', flags: MessageFlags.Ephemeral });
-    }
-
-    // Find the highest role the user currently has in the hierarchy
-    const currentRole = roleHierarchy.find(roleName => member.roles.cache.some(role => role.name === roleName));
-    if (!currentRole) {
-      return interaction.reply({ content: `${targetUser.tag} does not have any roles in the hierarchy.`, flags: MessageFlags.Ephemeral });
-    }
-    // Determine the previous role in the hierarchy
-    const currentRoleIndex = roleHierarchy.indexOf(currentRole);
-    const previousRole = roleHierarchy[currentRoleIndex - 1];
-    if (!previousRole) {
-      return interaction.reply({ content: `${targetUser.tag} already has the lowest role in the hierarchy.`, flags: MessageFlags.Ephemeral });
-    }
-    // Get the role objects for the current and previous roles
-    const previousRoleObject = interaction.guild.roles.cache.find(role => role.name === previousRole);
-    if (!previousRoleObject) {
-      return interaction.reply({ content: `The role "${previousRole}" does not exist on this server.`, flags: MessageFlags.Ephemeral });
-    }
-    
-    try {
-      // Remove the current role and add the previous role
-      await member.roles.remove(member.roles.cache.find(role => role.name === currentRole));
-      await member.roles.add(previousRoleObject);
-      await interaction.reply(`Successfully demoted **${targetUser.tag}** from **${currentRole}** to **${previousRole}**.`);
-    } catch (error) {
-      console.error(error);
-      await interaction.reply({ content: 'Failed to update roles. Make sure the bot has the correct permissions.', flags: MessageFlags.Ephemeral });
-    }
+    await interaction.reply(results.join('\n'));
   }
 
 
@@ -265,8 +282,6 @@ client.on(Events.InteractionCreate, async interaction => {
 
     // Handle /giverole command
     if (interaction.commandName === 'giverole') {
-
-      const roleHierarchy = ['test role 1', 'test role 2', 'test role 3']; // Add roles in ascending order of hierarchy
 
       // Check if the user has the required roles
       const requiredRoles = ['Perms'];
