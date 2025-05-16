@@ -30,14 +30,6 @@ client.once(Events.ClientReady, async (readyClient) => {
   await client.application?.commands.create(ping);
 
 
-
-  const selfdemote = new SlashCommandBuilder()
-    .setName('selfdemote')
-    .setDescription('Demotes yourself from the server.');
-  await client.application?.commands.create(selfdemote);
-
-
-
   const rank = new SlashCommandBuilder()
     .setName('rank')
     .setDescription('Shows your rank in the server.');
@@ -130,12 +122,6 @@ client.on(Events.InteractionCreate, async interaction => {
       console.error('Error replying to /ping command:', error);
       await interaction.reply({ content: 'An error occurred while processing the command.', ephemeral: true });
     }
-  }
-
-
-  // Handle /selfdemote command
-  if (interaction.commandName === 'selfdemote') {
-    interaction.reply('You have been demoted!');
   }
 
 
