@@ -23,6 +23,13 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}!`);
 
+  const uptime = new SlashCommandBuilder()
+    .setName('uptime')
+    .setDescription('Shows the bot\'s uptime.');
+  await client.application?.commands.create(uptime);
+
+
+
   // Define and register commands
   const ping = new SlashCommandBuilder()
     .setName('ping')
@@ -109,6 +116,11 @@ client.on(Events.InteractionCreate, async interaction => {
     }
   }
 
+  if(interaction.commandName === 'uptime') {
+    const uptime = process.uptime();
+    const uptimeMessage = `Bot Uptime: ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`;
+    await interaction.reply(uptimeMessage);
+  }
 
   // Handle /ping command
   if (interaction.commandName === 'ping') {
@@ -154,7 +166,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     const usersInput = interaction.options.getString('users');
-    const userIds = usersInput.split(',').map(user => user.trim().replace(/[<@!>]/g, '')); // Extract user IDs from mentions or raw input
+    const userIds = usersInput.split(',').map(user => user.trim().replace(/[<@!>]/, '')); // Extract user IDs from mentions or raw input
 
     const results = [];
 
